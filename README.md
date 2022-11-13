@@ -6,109 +6,117 @@ In this project I used apache airflow to scrape website periodically, use beauti
 
 <img src="images/postgresql.png" alt="postgresql" width="200"  height="100" />&nbsp;&nbsp;<img src="images/dash.png" alt="dash" width="200" height="100" />&nbsp;&nbsp;<img src="images/alchemy.jpeg" alt="sqlalchemy" width="200" height="100" />
 
-## using the project
-You can follow these steps to setup and you can use [this video]() to help you understand what is going on.
-1. Clone this repo.
-2. cd into the repo 
+## Run project
+#### 1. Clone Project
 ```
-cd scrape-epl-news
+git clone https://github.com/Imangali2002/scrape-fuel-prices-and-weather.git
 ```
-3. Run `setup_steps` to install dependencies. Make sure you are using `pyenv` to manage your python versions and `python 3.10.0` is installed in the pyenv manager.
 ```
-bash scripts/setup_steps.sh
+cd into scrape-fuel-prices-and-weather
+```
+#### 2. Run PostgreSQL with docker
+```
+docker run --name postgres_container -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=scraped_data -p 5423:5432 -v "$PWD"/pg_database:/var/lib/postgresql/data -d postgres
+```
+connect to the docker container bash
+```
+docker exec -it container_id bash
+```
+connect to psql command line
+```
+psql -U postgres -p 5432 -d scraped_data
+```
+for connect from main PC `psql -U postgres -h 127.0.0.1 -p 5423 -d scraped_data`
+
+run below sql commands to create users and give privileges
+```
+CREATE SCHEMA data;
+CREATE USER airflow_user WITH PASSWORD 'airflow_user';
+CREATE USER fastapi_user WITH PASSWORD 'fastapi_user';
+CREATE USER mlflow_user WITH PASSWORD 'mlflow_user';
+GRANT ALL PRIVILEGES ON DATABASE scraped_data TO airflow_user;
+GRANT ALL PRIVILEGES ON DATABASE scraped_data TO fastapi_user;
+GRANT ALL PRIVILEGES ON DATABASE scraped_data TO mlflow_user;
+GRANT ALL PRIVILEGES ON SCHEMA data to fastapi_user;
+GRANT ALL PRIVILEGES ON SCHEMA public to airflow_user;
 ```
 
-## setting up airflow
-
-1. activate the virtual environment
+#### 3. Create enviroment and install requirements
 ```
-source venv activate
+python -m venv venv
 ```
-
-2. set the `PYTHONPATH` environment variable
-```
-export PYTHONPATH
-```
-
-3. set the `AIRFLOW_HOME` variable
-```
-export AIRFLOW_HOME
-```
-
-4. initiate airflow by running `airflow version` command. This command is used to check the verion of airflow but it also helps to create the airflow config file in `AIRFLOW_HOME`
-```
-airflow version
-```
-
-5. Open `airflow.cfg` file created inside `AIRFLOW_HOME` and change the following parameters
-```
-sql_alchemy_conn = postgresql+psycopg2://<<username>>:<<password>>@<<host>>/<database>
-```
-This is because this project used postgres database to manage all metadata for airflow
-
-6. Initialise the database
-```
-airflow db init
-```
-
-7. create airflow users
-```
-airflow users create --username airflow --firstname Fname --lastname Lname --role Admin --email name@name.com --password airflow
-```
-
-## running fastapi
-fast api is used to manage the database iteractions. If the api is down no data will be submitted to the database. To run fastapi
-1. cd into the repo
-2. activate the virtual environment
+activate enviroment(Ubuntu)
 ```
 source venv/bin/activate
 ```
-3. run the following command
+for windows `venv\Scripts\activate`
+```
+pip install -r requirements.txt
+```
+```
+pip install --upgrade pip
+```
+```
+mkdir tmp
+```
+#### 4. Run FastAPI
+activate enviroment and run below command
+```
+source venv/bin/activate
+```
 ```
 uvicorn api.main:app
 ```
-4. You can access the api documentation on `http://127.0.0.1:8000/docs`
-
-## running airflow
-1. Open fresh terminal
-2. cd into the repo
-3. set the following environment variables as follows
-```
-export PYTHONPATH=`pwd`
-export AIRFLOW_HOME=`pwd`/airflow
-```
-4. activate the virtual environment
+#### 5. Run Airflow
 ```
 source venv/bin/activate
 ```
-5. run airflow scheduler
 ```
-airflow scheduler
+export AIRFLOW_HOME="$PWD"/airflow
 ```
-6. Open another fresh terminal and follow steps `2` to `4`
-7. run airflow webserver
+```
+export PYTHONPATH="$PWD"
+```
+```
+airflow init db
+```
+Open `airflow.cfg` and set `sql_alchemy_conn` with below options and set `load_examples` to False
+```
+sql_alchemy_conn = postgresql+psycopg2://airflow_user:airflow_user@127.0.0.1:5423/scraped_data
+```
+```
+load_examples = False
+```
+create user
+```
+airflow users create --username airflow --firstname fname --lastname lname --role Admin --email airflow@domain.com --password airflow
+```
+start webserver
 ```
 airflow webserver
 ```
-8. you can access airflow ui on `http://0.0.0.0:8080/`
+open new terminal, activate enviroment and run scheduler
+```
+source venv/bin/activate
+``` 
+```
+airflow scheduler
+```
 
-Note: ensure both terminals remain open for airflow to continue working
-
-## running dash 
-1. Open fresh terminal
-2. cd into the repo
-3. activate the virtual environment
+#### 6. Run Dash
 ```
 source venv/bin/activate
 ```
-4. run the following command to have dash running
+start dash app
 ```
 python dash/app.py
 ```
-5. you can access dash on `http://127.0.0.1:8050/`
 
-<!-- docker run --name postgres_container -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=scraped_data -p 5423:5432 -v "$PWD"/pg_database:/var/lib/postgresql/data -d postgres -->
 
-<!-- docker exec -it container__id bash -->
-<!-- psql -p 5432 -U postgres -d scraped_data -->
-<!-- psql -U airflow_user -h 127.0.0.1 -p 5423 -d scraped_data -->
+#### Open workspaces
+FastAPI documentation - `http://0.0.0.0:8000/docs`
+Airflow web app - `http://0.0.0.0:8080/`
+Dash web app - `http://127.0.0.1:8050/`
+
+<br>
+Run Airflow `Dags` and after few minutes refresh dash app.
